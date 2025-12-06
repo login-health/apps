@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Login.Health Scanner",
+    "slug": "loginhealth-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "loginhealth-scanner",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "health.login.scanner",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scanner needs camera access to scan patient QR codes containing health links.",
+        "NSPhotoLibraryUsageDescription": "Scanner needs photo access to import QR codes from saved images."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d9488"
+      },
+      "package": "health.login.scanner",
+      "permissions": [
+        "CAMERA"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Login.Health Scanner to access your camera to scan patient QR codes."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
