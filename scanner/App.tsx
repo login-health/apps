@@ -1,13 +1,20 @@
+import { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { ScanScreen } from "./src/screens/ScanScreen";
 import { ConfirmScreen } from "./src/screens/ConfirmScreen";
 import { HistoryScreen } from "./src/screens/HistoryScreen";
+import { migrateHistory } from "./src/lib/history";
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  useEffect(() => {
+    // Strip SHL keys from history saved by older versions
+    migrateHistory();
+  }, []);
+
   return (
     <NavigationContainer>
       <StatusBar style="light" />

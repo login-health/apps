@@ -11,7 +11,9 @@ import * as WebBrowser from "expo-web-browser";
 import * as Haptics from "expo-haptics";
 import { useScannerStore } from "../stores/scannerStore";
 import {
-  normalizeToFullUrl,
+  buildViewerUrl,
+  getManifestHost,
+  getViewerHost,
   requiresPasscode,
   isLongTermShare,
   formatExpiration,
@@ -36,15 +38,17 @@ export function ConfirmScreen({ navigation }: ConfirmScreenProps) {
   const hasPasscode = requiresPasscode(payload);
   const isLongTerm = isLongTermShare(payload);
   const expirationText = formatExpiration(payload.exp);
+  const manifestHost = getManifestHost(payload);
+  const viewerHost = getViewerHost();
 
   const handleViewRecords = async () => {
     setIsOpening(true);
 
     try {
-      const fullUrl = normalizeToFullUrl(data);
+      const fullUrl = buildViewerUrl(data);
 
-      // Save to history before opening
-      await saveToHistory(data, payload.label, payload.exp);
+      // Save to history before opening (label and host only, never the link)
+      await saveToHistory(manifestHost, payload.label);
 
       // Open in browser
       await WebBrowser.openBrowserAsync(fullUrl, {
@@ -103,6 +107,14 @@ export function ConfirmScreen({ navigation }: ConfirmScreenProps) {
         <View style={[styles.badge, styles.badgeExpiry]}>
           <Text style={styles.badgeText}>⏱️ {expirationText}</Text>
         </View>
+      </View>
+
+      {/* Where the data comes from and where it opens */}
+      <View style={styles.hostContainer}>
+        <Text style={styles.hostLabel}>Data will be fetched from:</Text>
+        <Text style={styles.hostValue}>{manifestHost}</Text>
+        <Text style={styles.hostLabel}>Opens in viewer:</Text>
+        <Text style={styles.hostValueSecondary}>{viewerHost}</Text>
       </View>
 
       {/* Info text */}
@@ -196,6 +208,31 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 14,
     color: "#333",
+  },
+  hostContainer: {
+    width: "100%",
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  hostLabel: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginBottom: 4,
+  },
+  hostValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 12,
+  },
+  hostValueSecondary: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#374151",
   },
   infoText: {
     fontSize: 14,

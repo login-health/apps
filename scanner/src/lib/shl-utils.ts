@@ -3,7 +3,11 @@
  *
  * Handles parsing and validation of SHL URLs in both formats:
  * - Raw: shlink:/eyJ1cmwiOi...
- * - Full: https://shl.login.health/#shlink:/eyJ1cmwiOi...
+ * - Full: https://<any host>/#shlink:/eyJ1cmwiOi...
+ *
+ * Only the shlink:/ part of a scan is ever used. The viewer URL is always
+ * rebuilt on the configured viewer host, so a QR code cannot send the
+ * decryption key to a host of its choosing.
  */
 
 export interface SHLPayload {
@@ -15,7 +19,15 @@ export interface SHLPayload {
   v?: number;        // Protocol version
 }
 
-export const FALLBACK_VIEWER_URL = "https://shl.login.health";
+/**
+ * Viewer the scanner opens links in. Set EXPO_PUBLIC_VIEWER_URL to override
+ * (e.g. a local viewer-app for demos).
+ */
+export const VIEWER_URL = (
+  process.env.EXPO_PUBLIC_VIEWER_URL || "https://viewer.login.health"
+).replace(/\/+$/, "");
+
+const SHL_PAYLOAD_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 /**
  * Check if a string is a valid SHL URL (either format)
@@ -25,16 +37,22 @@ export function isSHLUrl(data: string): boolean {
 }
 
 /**
- * Extract the raw shlink:/ URI from either format
+ * Extract the raw shlink:/ URI from either format, discarding any host
  */
 export function extractRawSHL(data: string): string {
-  if (data.includes("#shlink:/")) {
-    return data.split("#")[1];
+  const trimmed = data.trim();
+  let encoded: string | undefined;
+
+  if (trimmed.startsWith("shlink:/")) {
+    encoded = trimmed.slice("shlink:/".length);
+  } else if (trimmed.includes("#shlink:/")) {
+    encoded = trimmed.split("#shlink:/")[1];
   }
-  if (data.startsWith("shlink:/")) {
-    return data;
+
+  if (!encoded || !SHL_PAYLOAD_PATTERN.test(encoded)) {
+    throw new Error("Invalid SHL format");
   }
-  throw new Error("Invalid SHL format");
+  return `shlink:/${encoded}`;
 }
 
 /**
@@ -48,22 +66,60 @@ export function parseSHLPayload(scannedData: string): SHLPayload {
   const padding = "=".repeat((4 - (base64Payload.length % 4)) % 4);
   const base64 = base64Payload.replace(/-/g, "+").replace(/_/g, "/") + padding;
 
-  // Decode base64 to string
-  const jsonStr = atob(base64);
-  const payload: SHLPayload = JSON.parse(jsonStr);
+  // Decode base64 to string (error details omitted: they can echo the key)
+  let payload: SHLPayload;
+  try {
+    payload = JSON.parse(atob(base64));
+  } catch {
+    throw new Error("Invalid SHL: payload could not be decoded");
+  }
 
   // Validate required fields
-  if (!payload.url) {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Invalid SHL: payload could not be decoded");
+  }
+  if (!payload.url || typeof payload.url !== "string") {
     throw new Error("Invalid SHL: missing manifest URL");
   }
-  if (!payload.key) {
+  if (!payload.key || typeof payload.key !== "string") {
     throw new Error("Invalid SHL: missing encryption key");
   }
   if (payload.key.length !== 43) {
     throw new Error("Invalid SHL: malformed encryption key");
   }
+  getManifestHost(payload);
 
   return payload;
+}
+
+/**
+ * Hostname the viewer will fetch the manifest from. Throws unless the
+ * manifest URL is https.
+ */
+export function getManifestHost(payload: Pick<SHLPayload, "url">): string {
+  let manifestUrl: URL;
+  try {
+    manifestUrl = new URL(payload.url);
+  } catch {
+    throw new Error("Invalid SHL: malformed manifest URL");
+  }
+  if (manifestUrl.protocol !== "https:" || !manifestUrl.hostname) {
+    throw new Error(
+      "Invalid SHL: manifest URL must use https. This link was not opened."
+    );
+  }
+  return manifestUrl.hostname;
+}
+
+/**
+ * Hostname of the configured viewer, for display
+ */
+export function getViewerHost(): string {
+  try {
+    return new URL(VIEWER_URL).host;
+  } catch {
+    return VIEWER_URL;
+  }
 }
 
 /**
@@ -91,18 +147,11 @@ export function isLongTermShare(payload: SHLPayload): boolean {
 }
 
 /**
- * Normalize any SHL format to a full URL with viewer
+ * Build the viewer URL for any SHL format. The scanned URL's own host is
+ * never used; the payload is always opened on the configured viewer.
  */
-export function normalizeToFullUrl(scannedData: string): string {
-  if (scannedData.includes("#shlink:/")) {
-    // Already a full URL
-    return scannedData;
-  }
-  if (scannedData.startsWith("shlink:/")) {
-    // Raw URI - prepend fallback viewer
-    return `${FALLBACK_VIEWER_URL}/#${scannedData}`;
-  }
-  throw new Error("Invalid SHL format");
+export function buildViewerUrl(scannedData: string): string {
+  return `${VIEWER_URL}/#${extractRawSHL(scannedData)}`;
 }
 
 /**

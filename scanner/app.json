@@ -28,7 +28,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
@@ -37,10 +37,8 @@
         {
           "cameraPermission": "Allow Login.Health Scanner to access your camera to scan patient QR codes."
         }
-      ]
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
+      ],
+      "expo-asset"
+    ]
   }
 }

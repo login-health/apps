@@ -8,7 +8,6 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
-import * as WebBrowser from "expo-web-browser";
 import {
   getHistory,
   clearHistory,
@@ -16,7 +15,6 @@ import {
   formatScanDate,
   ScanHistoryItem,
 } from "../lib/history";
-import { normalizeToFullUrl, formatExpiration } from "../lib/shl-utils";
 
 interface HistoryScreenProps {
   navigation: any;
@@ -41,16 +39,12 @@ export function HistoryScreen({ navigation }: HistoryScreenProps) {
     setRefreshing(false);
   };
 
-  const handleOpenItem = async (item: ScanHistoryItem) => {
-    try {
-      const fullUrl = normalizeToFullUrl(item.scannedData);
-      await WebBrowser.openBrowserAsync(fullUrl, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-        controlsColor: "#0d9488",
-      });
-    } catch (error) {
-      Alert.alert("Error", "Could not open this link");
-    }
+  // History does not keep the link or its key, so entries cannot be reopened
+  const handleItemPress = () => {
+    Alert.alert(
+      "Re-scan to View",
+      "Scan history does not keep health links. Ask the patient to show their QR code again to view these records."
+    );
   };
 
   const handleDeleteItem = (item: ScanHistoryItem) => {
@@ -89,37 +83,31 @@ export function HistoryScreen({ navigation }: HistoryScreenProps) {
     );
   };
 
-  const renderItem = ({ item }: { item: ScanHistoryItem }) => {
-    const isExpired = item.expiration && Date.now() / 1000 > item.expiration;
-
-    return (
-      <TouchableOpacity
-        style={[styles.item, isExpired && styles.itemExpired]}
-        onPress={() => handleOpenItem(item)}
-        onLongPress={() => handleDeleteItem(item)}
-      >
-        <View style={styles.itemContent}>
-          <Text style={styles.itemLabel} numberOfLines={1}>
-            {item.label || "Health Link"}
-          </Text>
-          <Text style={styles.itemDate}>{formatScanDate(item.scannedAt)}</Text>
-          {item.expiration && (
-            <Text style={[styles.itemExpiry, isExpired && styles.expiredText]}>
-              {isExpired ? "Expired" : formatExpiration(item.expiration)}
-            </Text>
-          )}
-        </View>
-        <Text style={styles.itemArrow}>›</Text>
-      </TouchableOpacity>
-    );
-  };
+  const renderItem = ({ item }: { item: ScanHistoryItem }) => (
+    <TouchableOpacity
+      style={styles.item}
+      onPress={handleItemPress}
+      onLongPress={() => handleDeleteItem(item)}
+    >
+      <View style={styles.itemContent}>
+        <Text style={styles.itemLabel} numberOfLines={1}>
+          {item.label}
+        </Text>
+        <Text style={styles.itemDate}>{formatScanDate(item.scannedAt)}</Text>
+        <Text style={styles.itemHost} numberOfLines={1}>
+          From {item.manifestHost}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   const ListEmptyComponent = () => (
     <View style={styles.empty}>
       <Text style={styles.emptyIcon}>📋</Text>
       <Text style={styles.emptyTitle}>No Scan History</Text>
       <Text style={styles.emptyText}>
-        Scanned QR codes will appear here for easy access later.
+        A log of recent scans appears here. To view records again, re-scan
+        the patient's QR code.
       </Text>
       <TouchableOpacity
         style={styles.emptyButton}
@@ -154,7 +142,9 @@ export function HistoryScreen({ navigation }: HistoryScreenProps) {
         }
       />
 
-      <Text style={styles.hint}>Long press to delete a scan</Text>
+      <Text style={styles.hint}>
+        Re-scan the QR code to view records. Long press to delete a scan.
+      </Text>
     </View>
   );
 }
@@ -192,9 +182,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
   },
-  itemExpired: {
-    opacity: 0.6,
-  },
   itemContent: {
     flex: 1,
   },
@@ -208,18 +195,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6b7280",
   },
-  itemExpiry: {
+  itemHost: {
     fontSize: 12,
     color: "#0d9488",
     marginTop: 4,
-  },
-  expiredText: {
-    color: "#ef4444",
-  },
-  itemArrow: {
-    fontSize: 24,
-    color: "#9ca3af",
-    marginLeft: 8,
   },
   emptyContainer: {
     flex: 1,
